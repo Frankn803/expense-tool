@@ -230,13 +230,17 @@ select.fc{
 .copy-mini:active{background:var(--primary-bg)}
 
 /* ── File upload ── */
-.upload-area{
-  border:2px dashed var(--border);border-radius:10px;
-  padding:14px;text-align:center;cursor:pointer;
-  color:var(--primary);font-size:14px;font-weight:500;
-  transition:border-color .2s,background .2s;
+.upload-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.upload-half{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;padding:13px 8px;border:2px dashed var(--border);border-radius:10px;
+  cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;
 }
-.upload-area:active{border-color:var(--primary);background:var(--primary-bg)}
+.upload-half.fapiao{color:#e65c00;border-color:#ffd0b0}
+.upload-half.fapiao:active{background:#fff5ee;border-color:#e65c00}
+.upload-half.shuidan{color:#0077cc;border-color:#b0d8ff}
+.upload-half.shuidan:active{background:#eef7ff;border-color:#0077cc}
+.upload-half .uico{font-size:22px}
 .attach-item{
   display:flex;align-items:center;gap:10px;
   padding:8px;background:var(--bg);border-radius:9px;margin-bottom:8px;
@@ -249,29 +253,45 @@ select.fc{
   width:54px;height:54px;background:#fff0f0;border-radius:8px;
   display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;
 }
+.file-label{
+  display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;
+  border-radius:10px;margin-bottom:3px;
+}
+.file-label.fp{background:#fff0e6;color:#e65c00}
+.file-label.sd{background:#e6f3ff;color:#0077cc}
 .btn-remove{
   flex-shrink:0;width:26px;height:26px;border-radius:50%;
   border:1.5px solid var(--border);background:none;color:var(--sub);
   font-size:14px;cursor:pointer;line-height:1;
 }
 .attach-count{
-  display:inline-flex;align-items:center;gap:3px;
+  display:inline-flex;align-items:center;gap:4px;
   font-size:11px;padding:2px 8px;border-radius:20px;
   background:#fff3e0;color:#e67e00;font-weight:600;
 }
 /* detail sheet file area */
-.attach-grid{display:flex;flex-wrap:wrap;gap:8px;padding:12px 18px}
+.attach-section-title{
+  padding:12px 18px 6px;font-size:11px;font-weight:700;
+  color:var(--sub);text-transform:uppercase;letter-spacing:.6px;
+  border-top:1px solid var(--border);margin-top:4px;
+}
+.attach-group{padding:0 18px 12px}
+.attach-group-label{
+  font-size:12px;font-weight:700;margin-bottom:8px;
+  display:flex;align-items:center;gap:6px;
+}
+.attach-grid{display:flex;flex-wrap:wrap;gap:8px}
 .attach-grid-img{
-  width:80px;height:80px;object-fit:cover;border-radius:8px;cursor:pointer;
+  width:86px;height:86px;object-fit:cover;border-radius:10px;cursor:pointer;
   border:1px solid var(--border);
 }
 .attach-grid-pdf{
-  width:80px;height:80px;background:#fff0f0;border-radius:8px;
+  width:86px;height:86px;background:#fff0f0;border-radius:10px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  font-size:24px;cursor:pointer;border:1px solid var(--border);
-  font-size:28px;
+  cursor:pointer;border:1px solid #ffd0b0;
 }
-.attach-grid-pdf span{font-size:10px;color:var(--sub);margin-top:4px;text-align:center;padding:0 4px;word-break:break-all}
+.attach-grid-pdf .pico{font-size:28px}
+.attach-grid-pdf .pname{font-size:9px;color:var(--sub);margin-top:4px;text-align:center;padding:0 4px;word-break:break-all;line-height:1.3}
 </style>
 </head>
 <body>
@@ -422,13 +442,20 @@ select.fc{
   </div>
 
   <div class="card">
-    <div class="sec-title">附件（水单 / 发票）</div>
+    <div class="sec-title">附件</div>
     <div id="attach-preview"></div>
-    <label class="upload-area">
-      <input type="file" id="file-input" accept="image/*,.pdf" multiple
-        style="display:none" onchange="handleFiles(this)">
-      📎 &nbsp;添加图片或 PDF
-    </label>
+    <div class="upload-row">
+      <label class="upload-half fapiao">
+        <input type="file" accept="image/*,.pdf" multiple
+          style="display:none" onchange="handleFiles(this,'发票')">
+        <span class="uico">🧾</span>上传发票
+      </label>
+      <label class="upload-half shuidan">
+        <input type="file" accept="image/*,.pdf" multiple
+          style="display:none" onchange="handleFiles(this,'水单')">
+        <span class="uico">💳</span>上传水单
+      </label>
+    </div>
   </div>
 
   <div class="card">
@@ -473,7 +500,8 @@ select.fc{
 
 <script>
 const KEY = 'expense_v1';
-let pendingFiles = []; // [{name, type, data}]
+let pendingFiles = []; // [{label:'发票'|'水单', name, type, data}]
+let filesDB = null;
 
 /* ── helpers ── */
 const $  = id => document.getElementById(id);
@@ -494,27 +522,75 @@ function copyText(txt) {
   }
 }
 
+/* ── IndexedDB ── */
+function initFilesDB() {
+  return new Promise(resolve => {
+    const req = indexedDB.open('ExpenseFilesDB', 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('files')) {
+        const store = db.createObjectStore('files', { keyPath: 'uid' });
+        store.createIndex('expenseId', 'expenseId', { unique: false });
+      }
+    };
+    req.onsuccess = e => { filesDB = e.target.result; resolve(); };
+    req.onerror   = () => resolve();
+  });
+}
+
+function dbSaveFiles(expenseId, files) {
+  if (!filesDB || !files.length) return Promise.resolve();
+  return new Promise(resolve => {
+    const tx = filesDB.transaction('files', 'readwrite');
+    const store = tx.objectStore('files');
+    files.forEach((f, i) => store.put({ uid: `${expenseId}_${i}`, expenseId, ...f }));
+    tx.oncomplete = resolve;
+    tx.onerror    = resolve;
+  });
+}
+
+function dbGetFiles(expenseId) {
+  if (!filesDB) return Promise.resolve([]);
+  return new Promise(resolve => {
+    const tx  = filesDB.transaction('files', 'readonly');
+    const idx = tx.objectStore('files').index('expenseId');
+    const req = idx.getAll(expenseId);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror   = () => resolve([]);
+  });
+}
+
+function dbDeleteFiles(expenseId) {
+  if (!filesDB) return Promise.resolve();
+  return dbGetFiles(expenseId).then(files => new Promise(resolve => {
+    if (!files.length) return resolve();
+    const tx    = filesDB.transaction('files', 'readwrite');
+    const store = tx.objectStore('files');
+    files.forEach(f => store.delete(f.uid));
+    tx.oncomplete = resolve;
+    tx.onerror    = resolve;
+  }));
+}
+
 /* ── File upload ── */
-function handleFiles(input) {
+function handleFiles(input, label) {
   const files = Array.from(input.files);
   if (!files.length) return;
   let pending = files.length;
 
   files.forEach(file => {
-    if (file.size > 15 * 1024 * 1024) {
-      toast(`⚠️ ${file.name} 超过15MB限制`); pending--; return;
+    if (file.size > 20 * 1024 * 1024) {
+      toast(`⚠️ ${file.name} 超过20MB`); pending--; return;
     }
+    const done = data => {
+      pendingFiles.push({ label, name: file.name, type: file.type, data });
+      if (--pending === 0) renderAttachPreview();
+    };
     if (file.type.startsWith('image/')) {
-      compressImage(file, 1200, 0.78).then(data => {
-        pendingFiles.push({ name: file.name, type: file.type, data });
-        if (--pending === 0) renderAttachPreview();
-      });
+      compressImage(file, 1400, 0.80).then(done);
     } else {
       const reader = new FileReader();
-      reader.onload = e => {
-        pendingFiles.push({ name: file.name, type: file.type, data: e.target.result });
-        if (--pending === 0) renderAttachPreview();
-      };
+      reader.onload = e => done(e.target.result);
       reader.readAsDataURL(file);
     }
   });
@@ -543,17 +619,23 @@ function compressImage(file, maxW, q) {
 function renderAttachPreview() {
   const wrap = $('attach-preview');
   if (!wrap) return;
-  wrap.innerHTML = pendingFiles.map((f, i) => `
+  if (!pendingFiles.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = pendingFiles.map((f, i) => {
+    const isFP = f.label === '发票';
+    const labelCls = isFP ? 'fp' : 'sd';
+    return `
     <div class="attach-item">
       ${f.type.startsWith('image/')
-        ? `<img class="attach-thumb" src="${f.data}" onclick="viewFileByData('${i}','pending')">`
+        ? `<img class="attach-thumb" src="${f.data}" onclick="previewPending(${i})">`
         : `<div class="attach-pdf">📄</div>`}
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</div>
-        <div style="font-size:11px;color:var(--sub)">${f.type.startsWith('image/') ? '图片' : 'PDF 文档'}</div>
+        <div><span class="file-label ${labelCls}">${f.label}</span></div>
+        <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</div>
+        <div style="font-size:11px;color:var(--sub)">${f.type.startsWith('image/') ? '图片' : 'PDF'}</div>
       </div>
       <button class="btn-remove" onclick="removeAttach(${i})">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function removeAttach(i) {
@@ -561,16 +643,19 @@ function removeAttach(i) {
   renderAttachPreview();
 }
 
-function viewFileByData(idx, src, recId) {
-  let f;
-  if (src === 'pending') f = pendingFiles[+idx];
-  else f = (get().find(r => r.id === +recId)?.files || [])[+idx];
+function previewPending(i) {
+  const f = pendingFiles[i];
   if (!f) return;
+  openFileViewer(f);
+}
+
+function openFileViewer(f) {
   const win = window.open('', '_blank');
+  if (!win) return;
   if (f.type === 'application/pdf') {
-    win.document.write(`<iframe src="${f.data}" style="width:100%;height:100%;border:none"></iframe>`);
+    win.document.write(`<html><body style="margin:0"><iframe src="${f.data}" style="width:100vw;height:100vh;border:none"></iframe></body></html>`);
   } else {
-    win.document.write(`<img src="${f.data}" style="max-width:100%;height:auto;display:block">`);
+    win.document.write(`<html><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${f.data}" style="max-width:100%;max-height:100vh;object-fit:contain"></body></html>`);
   }
 }
 
@@ -611,11 +696,11 @@ function switchPage(p) {
 }
 
 /* ── Init ── */
-(function init() {
+initFilesDB().then(() => {
   $('transDate').value = new Date().toISOString().split('T')[0];
   toggleMealRow('个人餐费');
   renderList();
-})();
+});
 
 /* ── PWA: icon + manifest ── */
 (function initPWA() {
@@ -711,20 +796,16 @@ function saveExpense() {
     currency: $('currency').value,
     receiptStatus: $('receiptStatus').value,
     comment: $('comment').value.trim(),
-    files: pendingFiles.slice(),
+    fileCount: pendingFiles.length,
+    fileSummary: [...new Set(pendingFiles.map(f => f.label))].join(' & '),
   };
 
   const data = get();
   data.unshift(rec);
-  try {
-    set(data);
-  } catch(e) {
-    // localStorage full — save without files
-    rec.files = [];
-    data[0] = rec;
-    set(data);
-    toast('⚠️ 存储空间不足，附件未保存');
-  }
+  set(data);
+
+  // Save files to IndexedDB (linked by rec.id)
+  dbSaveFiles(rec.id, pendingFiles);
 
   // reset
   $('amount').value = '';
@@ -810,7 +891,7 @@ function renderCard(r) {
         ${mealTag}${tags}
       </div>
       ${r.comment ? `<div class="ec-comment">💬 ${r.comment}</div>` : ''}
-      ${r.files && r.files.length ? `<div style="margin-top:7px"><span class="attach-count">📎 ${r.files.length} 个附件</span></div>` : ''}
+      ${r.fileCount ? `<div style="margin-top:7px"><span class="attach-count">📎 ${r.fileCount}个附件 · ${r.fileSummary}</span></div>` : ''}
     </div>
     <div class="ec-footer">
       <button class="btn-act cp" onclick="copyById(${r.id})">📋 复制填报信息</button>
@@ -839,23 +920,50 @@ function openDetail(id) {
 
   $('sheet-title').textContent = r.expenseType + ' — ' + r.transDate;
 
-  let filesHtml = '';
-  if (r.files && r.files.length) {
-    filesHtml = `
-      <div style="padding:12px 18px 4px;font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.6px">附件</div>
-      <div class="attach-grid">
-        ${r.files.map((f, i) => f.type.startsWith('image/')
-          ? `<img class="attach-grid-img" src="${f.data}" onclick="viewFileByData(${i},'rec',${r.id})">`
-          : `<div class="attach-grid-pdf" onclick="viewFileByData(${i},'rec',${r.id})">📄<span>${f.name.slice(0,10)}</span></div>`
-        ).join('')}
-      </div>`;
-  }
-
-  $('sheet-body').innerHTML = rows.map(([k,v]) =>
+  const baseHtml = rows.map(([k,v]) =>
     `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val">${v}</span></div>`
-  ).join('') + filesHtml;
+  ).join('');
+
+  $('sheet-body').innerHTML = baseHtml + `<div id="sheet-files" style="padding:12px 18px;color:var(--sub);font-size:13px">附件加载中…</div>`;
   $('sheet-copy-btn').onclick = () => { copyById(id); closeSheet(); };
   $('sheet-overlay').classList.add('open');
+
+  // async load files from IndexedDB
+  dbGetFiles(id).then(files => {
+    if (!files.length) {
+      $('sheet-files').textContent = '';
+      return;
+    }
+    // group by label
+    const groups = {};
+    files.forEach(f => {
+      if (!groups[f.label]) groups[f.label] = [];
+      groups[f.label].push(f);
+    });
+    const labelIcon = { '发票': '🧾', '水单': '💳' };
+    const labelCls  = { '发票': 'fp', '水单': 'sd' };
+
+    const html = `<div class="attach-section-title">附件</div>` +
+      Object.entries(groups).map(([label, flist]) => `
+        <div class="attach-group">
+          <div class="attach-group-label">
+            <span class="file-label ${labelCls[label]||'fp'}">${labelIcon[label]||'📎'} ${label}</span>
+            <span style="font-size:11px;color:var(--sub);font-weight:400">${flist.length} 个文件</span>
+          </div>
+          <div class="attach-grid">
+            ${flist.map(f => f.type.startsWith('image/')
+              ? `<img class="attach-grid-img" src="${f.data}" onclick="openFileViewer(${JSON.stringify(f).split('"data"')[0]+'"data":"'+f.data+'"}'}" style="cursor:pointer">`
+              : `<div class="attach-grid-pdf" onclick='openFileViewer(${JSON.stringify({type:f.type,data:f.data})})'>
+                  <span class="pico">📄</span>
+                  <span class="pname">${f.name}</span>
+                </div>`
+            ).join('')}
+          </div>
+        </div>`
+      ).join('');
+
+    $('sheet-files').outerHTML = html;
+  });
 }
 
 function closeSheet(e) {
@@ -899,6 +1007,7 @@ function copyById(id) {
 function deleteById(id) {
   if (!confirm('确认删除这条记录？')) return;
   set(get().filter(r => r.id !== id));
+  dbDeleteFiles(id);
   renderList();
   toast('已删除');
 }
