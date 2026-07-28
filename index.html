@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>报销助手</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f4f9;
+  --card:#fff;
+  --primary:#1677ff;
+  --primary-bg:#e8f1ff;
+  --text:#111;
+  --sub:#666;
+  --border:#e4e8ee;
+  --danger:#ff4d4f;
+  --success:#00b96b;
+  --radius:14px;
+  --shadow:0 2px 16px rgba(0,0,0,.07);
+  --nav-h:68px;
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100vh;padding-bottom:var(--nav-h);
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* ── Header ── */
+.hdr{
+  background:var(--primary);color:#fff;
+  padding:14px 18px 12px;
+  position:sticky;top:0;z-index:90;
+  box-shadow:0 2px 12px rgba(22,119,255,.25);
+}
+.hdr-row{display:flex;align-items:center;justify-content:space-between}
+.hdr h1{font-size:17px;font-weight:700;letter-spacing:.3px}
+.hdr-sub{font-size:11px;opacity:.75;margin-top:2px}
+.hdr-badge{
+  background:rgba(255,255,255,.2);color:#fff;
+  font-size:12px;padding:4px 10px;border-radius:20px;
+  font-weight:600;
+}
+
+/* ── Bottom nav ── */
+.bnav{
+  position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);
+  background:#fff;border-top:1px solid var(--border);
+  display:flex;z-index:90;
+}
+.bnav-btn{
+  flex:1;border:none;background:none;
+  font-size:11px;color:var(--sub);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:4px;padding-bottom:8px;
+  transition:color .15s;
+}
+.bnav-btn.active{color:var(--primary)}
+.bnav-btn svg{width:24px;height:24px;stroke-width:1.8}
+
+/* ── Pages ── */
+.page{display:none;padding:14px 14px 20px}
+.page.active{display:block}
+
+/* ── Cards ── */
+.card{
+  background:var(--card);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:16px;margin-bottom:12px;
+}
+.sec-title{
+  font-size:11px;font-weight:700;color:var(--sub);
+  text-transform:uppercase;letter-spacing:.8px;
+  margin-bottom:14px;
+}
+
+/* ── Form ── */
+.fg{margin-bottom:14px}
+.fg:last-child{margin-bottom:0}
+.label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:500}
+.req{color:var(--danger)}
+.fc{
+  width:100%;padding:10px 12px;
+  border:1.5px solid var(--border);border-radius:9px;
+  font-size:15px;background:#fff;color:var(--text);
+  -webkit-appearance:none;appearance:none;
+  transition:border-color .2s;
+  font-family:inherit;
+}
+.fc:focus{outline:none;border-color:var(--primary)}
+.fc::placeholder{color:#bbb}
+select.fc{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;padding-right:32px;
+}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+
+/* Amount field */
+.amount-wrap{position:relative}
+.amount-prefix{
+  position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  font-size:16px;font-weight:600;color:var(--primary);pointer-events:none;
+}
+#amount{padding-left:26px;font-size:18px;font-weight:700;color:var(--primary)}
+
+/* ── Chips (quick select) ── */
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}
+.chip{
+  padding:5px 12px;border-radius:20px;font-size:13px;
+  border:1.5px solid var(--border);background:#fff;
+  color:var(--sub);cursor:pointer;transition:all .15s;
+  white-space:nowrap;
+}
+.chip.selected{border-color:var(--primary);background:var(--primary-bg);color:var(--primary);font-weight:600}
+
+/* ── Primary btn ── */
+.btn-save{
+  width:100%;padding:14px;
+  background:var(--primary);color:#fff;
+  border:none;border-radius:11px;font-size:16px;font-weight:700;
+  cursor:pointer;margin-top:4px;letter-spacing:.3px;
+  box-shadow:0 4px 16px rgba(22,119,255,.3);
+}
+.btn-save:active{opacity:.85;transform:scale(.99)}
+
+/* ── Stats ── */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.stat{
+  background:var(--card);border-radius:12px;
+  box-shadow:var(--shadow);padding:12px 8px;text-align:center;
+}
+.stat-v{font-size:19px;font-weight:800;color:var(--primary)}
+.stat-l{font-size:10px;color:var(--sub);margin-top:2px}
+
+/* ── Expense item ── */
+.ec{
+  background:var(--card);border-radius:var(--radius);
+  box-shadow:var(--shadow);margin-bottom:10px;overflow:hidden;
+}
+.ec-main{padding:14px 14px 10px;cursor:pointer}
+.ec-top{display:flex;justify-content:space-between;align-items:flex-start}
+.ec-type{font-size:15px;font-weight:700}
+.ec-amt{font-size:20px;font-weight:800;color:var(--primary)}
+.ec-date{font-size:12px;color:var(--sub);margin-top:1px}
+.ec-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.tag{
+  font-size:11px;padding:2px 9px;border-radius:20px;
+  background:var(--primary-bg);color:var(--primary);font-weight:500;
+}
+.tag.g{background:#f0f0f0;color:#666}
+.ec-comment{font-size:12px;color:#999;margin-top:7px;line-height:1.5}
+.ec-footer{
+  display:flex;border-top:1px solid var(--border);
+}
+.btn-act{
+  flex:1;padding:10px 8px;border:none;background:none;
+  font-size:13px;cursor:pointer;font-family:inherit;
+  transition:background .15s;
+}
+.btn-act:active{background:#f5f5f5}
+.btn-act.cp{color:var(--primary)}
+.btn-act.del{color:var(--danger);border-left:1px solid var(--border)}
+
+/* ── Empty ── */
+.empty{text-align:center;padding:60px 20px;color:var(--sub)}
+.empty .ico{font-size:52px;margin-bottom:14px}
+.empty p{font-size:14px;line-height:1.8}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:86px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:rgba(0,0,0,.78);color:#fff;
+  padding:10px 20px;border-radius:24px;font-size:14px;
+  z-index:999;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Detail sheet ── */
+.sheet-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.45);
+  z-index:200;opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.sheet-overlay.open{opacity:1;pointer-events:all}
+.sheet{
+  position:absolute;bottom:0;left:0;right:0;
+  background:#fff;border-radius:20px 20px 0 0;
+  padding:0 0 30px;
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);
+  max-height:85vh;overflow-y:auto;
+}
+.sheet-overlay.open .sheet{transform:translateY(0)}
+.sheet-handle{width:36px;height:4px;background:#ddd;border-radius:4px;margin:12px auto 16px}
+.sheet-title{font-size:16px;font-weight:700;padding:0 18px 14px;border-bottom:1px solid var(--border)}
+.detail-row{
+  display:flex;padding:11px 18px;border-bottom:1px solid var(--border);
+  align-items:flex-start;gap:10px;
+}
+.detail-key{font-size:12px;color:var(--sub);min-width:76px;padding-top:1px}
+.detail-val{font-size:14px;font-weight:500;flex:1;word-break:break-all}
+.sheet-copy{
+  margin:16px 18px 0;width:calc(100% - 36px);
+  padding:13px;background:var(--primary);color:#fff;
+  border:none;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;
+  font-family:inherit;
+}
+
+/* ── Hidden conditional ── */
+.meal-row{display:none}
+.meal-row.show{display:grid}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-row">
+    <div>
+      <h1>📋 报销助手</h1>
+      <div class="hdr-sub">记录费用 · 对照填报</div>
+    </div>
+    <div class="hdr-badge" id="total-badge">¥ 0</div>
+  </div>
+</div>
+
+<!-- ════════ LIST PAGE ════════ -->
+<div id="page-list" class="page active">
+  <div class="stats" id="stats"></div>
+  <div id="list-wrap"></div>
+</div>
+
+<!-- ════════ NEW PAGE ════════ -->
+<div id="page-new" class="page">
+
+  <div class="card">
+    <div class="sec-title">费用类型</div>
+    <div class="chips" id="type-chips">
+      <div class="chip selected" data-v="个人餐费">🍱 个人餐费</div>
+      <div class="chip" data-v="团队餐费">🍽 团队餐费</div>
+      <div class="chip" data-v="交通费">🚕 交通费</div>
+      <div class="chip" data-v="住宿费">🏨 住宿费</div>
+      <div class="chip" data-v="办公用品">📦 办公用品</div>
+      <div class="chip" data-v="其他">💼 其他</div>
+    </div>
+    <input type="hidden" id="expenseType" value="个人餐费">
+  </div>
+
+  <div class="card">
+    <div class="sec-title">金额 &amp; 日期</div>
+    <div class="fg">
+      <div class="amount-wrap">
+        <span class="amount-prefix">¥</span>
+        <input id="amount" type="number" class="fc" placeholder="0.00" step="0.01" inputmode="decimal">
+      </div>
+    </div>
+    <div class="row3">
+      <div class="fg">
+        <label class="label">币种 <span class="req">*</span></label>
+        <select id="currency" class="fc">
+          <option value="CNY">CNY</option>
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+          <option value="HKD">HKD</option>
+          <option value="JPY">JPY</option>
+        </select>
+      </div>
+      <div class="fg" style="grid-column:span 2">
+        <label class="label">交易日期 <span class="req">*</span></label>
+        <input type="date" id="transDate" class="fc">
+      </div>
+    </div>
+    <div class="fg">
+      <label class="label">支付方式</label>
+      <div class="chips" id="pay-chips">
+        <div class="chip selected" data-v="Cash">现金</div>
+        <div class="chip" data-v="Corporate Card">公司卡</div>
+        <div class="chip" data-v="Personal Card">个人卡</div>
+        <div class="chip" data-v="WeChat/Alipay">微信/支付宝</div>
+      </div>
+      <input type="hidden" id="payType" value="Cash">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec-title">业务信息</div>
+    <div class="fg">
+      <label class="label">商业目的 <span class="req">*</span></label>
+      <input type="text" id="bizPurpose" class="fc" placeholder="例：与客户商务洽谈">
+    </div>
+    <div class="fg">
+      <label class="label">商家名称 <span class="req">*</span></label>
+      <input type="text" id="vendor" class="fc" placeholder="餐厅 / 商家名称">
+    </div>
+    <div class="row2 meal-row" id="meal-row">
+      <div class="fg">
+        <label class="label">餐饮类型 <span class="req">*</span></label>
+        <select id="mealType" class="fc">
+          <option value="">请选择</option>
+          <option value="早餐">早餐</option>
+          <option value="午餐">午餐</option>
+          <option value="晚餐">晚餐</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="label">就餐人数</label>
+        <input type="number" id="attendees" class="fc" value="1" min="1" inputmode="numeric">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="fg">
+        <label class="label">消费城市 <span class="req">*</span></label>
+        <select id="city" class="fc">
+          <option>上海</option><option>北京</option><option>深圳</option>
+          <option>广州</option><option>成都</option><option>杭州</option>
+          <option>南京</option><option>武汉</option><option>苏州</option>
+          <option>其他</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="label">收据状态</label>
+        <select id="receiptStatus" class="fc">
+          <option value="Receipt">有收据</option>
+          <option value="No Receipt">无收据</option>
+          <option value="Lost Receipt">收据丢失</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="label">成本中心</label>
+      <input type="text" id="costCenter" class="fc" value="CN50C09711">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec-title">备注（选填）</div>
+    <textarea id="comment" class="fc" rows="3"
+      placeholder="其他说明，最多 500 字" maxlength="500"
+      style="resize:none"></textarea>
+  </div>
+
+  <button class="btn-save" onclick="saveExpense()">💾 保存记录</button>
+</div>
+
+<!-- ── Bottom nav ── -->
+<nav class="bnav">
+  <button class="bnav-btn active" id="nav-list" onclick="switchPage('list')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+    </svg>
+    记录
+  </button>
+  <button class="bnav-btn" id="nav-new" onclick="switchPage('new')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <circle cx="12" cy="12" r="9"/>
+      <line x1="12" y1="8" x2="12" y2="16"/>
+      <line x1="8" y1="12" x2="16" y2="12"/>
+    </svg>
+    新增
+  </button>
+</nav>
+
+<!-- ── Detail sheet ── -->
+<div class="sheet-overlay" id="sheet-overlay" onclick="closeSheet(event)">
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="sheet-title">费用详情</div>
+    <div id="sheet-body"></div>
+    <button class="sheet-copy" id="sheet-copy-btn">📋 复制全部信息</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = 'expense_v1';
+
+/* ── helpers ── */
+const $  = id => document.getElementById(id);
+const get = () => JSON.parse(localStorage.getItem(KEY) || '[]');
+const set = d  => localStorage.setItem(KEY, JSON.stringify(d));
+const fmt = n  => parseFloat(n).toFixed(2);
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+/* ── Chips ── */
+document.querySelectorAll('.chips').forEach(wrap => {
+  wrap.addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    wrap.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+    chip.classList.add('selected');
+    const hid = wrap.nextElementSibling;  // hidden input
+    if (hid && hid.tagName === 'INPUT') hid.value = chip.dataset.v;
+    if (wrap.id === 'type-chips') toggleMealRow(chip.dataset.v);
+  });
+});
+
+function toggleMealRow(type) {
+  $('meal-row').classList.toggle('show', type.includes('餐'));
+  const amtLabel = $('amount').previousElementSibling;
+  if (amtLabel) amtLabel.querySelector('.amount-prefix') && null;
+}
+
+/* ── Nav ── */
+function switchPage(p) {
+  ['list','new'].forEach(x => {
+    $('page-'+x).classList.toggle('active', x===p);
+    $('nav-'+x).classList.toggle('active', x===p);
+  });
+  if (p === 'list') renderList();
+}
+
+/* ── Init ── */
+(function init() {
+  $('transDate').value = new Date().toISOString().split('T')[0];
+  toggleMealRow('个人餐费');
+  renderList();
+})();
+
+/* ── Save ── */
+function saveExpense() {
+  const amount = $('amount').value;
+  const biz    = $('bizPurpose').value.trim();
+  const vendor = $('vendor').value.trim();
+  const date   = $('transDate').value;
+  const type   = $('expenseType').value;
+
+  if (!amount || parseFloat(amount) <= 0) return toast('⚠️ 请输入金额');
+  if (!biz)    return toast('⚠️ 请填写商业目的');
+  if (!vendor) return toast('⚠️ 请填写商家名称');
+  if (!date)   return toast('⚠️ 请选择日期');
+  if (type.includes('餐') && !$('mealType').value) return toast('⚠️ 请选择餐饮类型');
+
+  const rec = {
+    id: Date.now(),
+    expenseType: type,
+    transDate: date,
+    bizPurpose: biz,
+    mealType: $('mealType').value,
+    attendees: $('attendees').value || 1,
+    vendor,
+    city: $('city').value,
+    costCenter: $('costCenter').value,
+    payType: $('payType').value,
+    amount: fmt(amount),
+    currency: $('currency').value,
+    receiptStatus: $('receiptStatus').value,
+    comment: $('comment').value.trim(),
+  };
+
+  const data = get();
+  data.unshift(rec);
+  set(data);
+
+  // reset
+  $('amount').value = '';
+  $('bizPurpose').value = '';
+  $('vendor').value = '';
+  $('comment').value = '';
+  $('mealType').value = '';
+  $('transDate').value = new Date().toISOString().split('T')[0];
+
+  toast('✅ 已保存');
+  setTimeout(() => switchPage('list'), 600);
+}
+
+/* ── Render list ── */
+function renderList() {
+  const data = get();
+  const wrap = $('list-wrap');
+  const stats = $('stats');
+
+  // badge
+  const cnySum = data.filter(r=>r.currency==='CNY').reduce((s,r)=>s+parseFloat(r.amount),0);
+  $('total-badge').textContent = '¥ ' + (cnySum >= 10000
+    ? (cnySum/10000).toFixed(1)+'万' : cnySum.toFixed(0));
+
+  // stats cards
+  const thisMonth = new Date().toISOString().slice(0,7);
+  const monthData = data.filter(r => r.transDate.startsWith(thisMonth));
+  const monthSum  = monthData.filter(r=>r.currency==='CNY').reduce((s,r)=>s+parseFloat(r.amount),0);
+  stats.innerHTML = `
+    <div class="stat"><div class="stat-v">${data.length}</div><div class="stat-l">总记录</div></div>
+    <div class="stat"><div class="stat-v">¥${cnySum.toFixed(0)}</div><div class="stat-l">CNY 合计</div></div>
+    <div class="stat"><div class="stat-v">¥${monthSum.toFixed(0)}</div><div class="stat-l">本月</div></div>
+  `;
+
+  if (!data.length) {
+    wrap.innerHTML = `<div class="empty">
+      <div class="ico">🧾</div>
+      <p>暂无记录<br>点击下方「新增」开始记录</p>
+    </div>`;
+    return;
+  }
+
+  // group by month
+  const groups = {};
+  data.forEach(r => {
+    const m = r.transDate.slice(0,7);
+    if (!groups[m]) groups[m] = [];
+    groups[m].push(r);
+  });
+
+  wrap.innerHTML = Object.entries(groups).map(([m, items]) => {
+    const mSum = items.filter(r=>r.currency==='CNY').reduce((s,r)=>s+parseFloat(r.amount),0);
+    const label = m.replace('-','年') + '月';
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;
+        padding:4px 2px 8px;font-size:12px;color:var(--sub);font-weight:600">
+        <span>${label}</span><span>CNY ${mSum.toFixed(2)}</span>
+      </div>
+      ${items.map(r => renderCard(r)).join('')}
+    `;
+  }).join('');
+}
+
+function renderCard(r) {
+  const sym = r.currency === 'CNY' ? '¥' : (r.currency + ' ');
+  const tags = [r.city, r.payType, r.receiptStatus]
+    .filter(Boolean).map(t => `<span class="tag g">${t}</span>`).join('');
+  const mealTag = r.mealType ? `<span class="tag">${r.mealType}</span>` : '';
+  return `
+  <div class="ec">
+    <div class="ec-main" onclick="openDetail(${r.id})">
+      <div class="ec-top">
+        <div>
+          <div class="ec-type">${r.expenseType}</div>
+          <div class="ec-date">${r.transDate} &nbsp;·&nbsp; ${r.vendor}</div>
+        </div>
+        <div class="ec-amt">${sym}${r.amount}</div>
+      </div>
+      <div class="ec-tags">
+        <span class="tag">${r.bizPurpose}</span>
+        ${mealTag}${tags}
+      </div>
+      ${r.comment ? `<div class="ec-comment">💬 ${r.comment}</div>` : ''}
+    </div>
+    <div class="ec-footer">
+      <button class="btn-act cp" onclick="copyById(${r.id})">📋 复制填报信息</button>
+      <button class="btn-act del" onclick="deleteById(${r.id})">🗑 删除</button>
+    </div>
+  </div>`;
+}
+
+/* ── Detail sheet ── */
+function openDetail(id) {
+  const r = get().find(x => x.id === id);
+  if (!r) return;
+  const rows = [
+    ['费用类型', r.expenseType],
+    ['交易日期', r.transDate],
+    ['金额',     `${r.currency} ${r.amount}`],
+    ['支付方式', r.payType],
+    ['商业目的', r.bizPurpose],
+    ['商家名称', r.vendor],
+    r.mealType && ['餐饮类型', r.mealType + (r.attendees>1?` · ${r.attendees}人`:'')],
+    ['消费城市', r.city],
+    ['成本中心', r.costCenter],
+    ['收据状态', r.receiptStatus],
+    r.comment && ['备注', r.comment],
+  ].filter(Boolean);
+
+  $('sheet-title').textContent = r.expenseType + ' — ' + r.transDate;
+  $('sheet-body').innerHTML = rows.map(([k,v]) =>
+    `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val">${v}</span></div>`
+  ).join('');
+  $('sheet-copy-btn').onclick = () => { copyById(id); closeSheet(); };
+  $('sheet-overlay').classList.add('open');
+}
+
+function closeSheet(e) {
+  if (!e || !$('sheet').contains(e.target)) {
+    $('sheet-overlay').classList.remove('open');
+  }
+}
+
+/* ── Copy ── */
+function copyById(id) {
+  const r = get().find(x => x.id === id);
+  if (!r) return;
+  const lines = [
+    '【报销填报信息】',
+    `Expense Type      : ${r.expenseType}`,
+    `Transaction Date  : ${r.transDate}`,
+    `Amount            : ${r.currency} ${r.amount}`,
+    `Payment Type      : ${r.payType}`,
+    `Business Purpose  : ${r.bizPurpose}`,
+    `Vendor Name       : ${r.vendor}`,
+    r.mealType ? `Meal Type         : ${r.mealType}` : '',
+    `City of Purchase  : ${r.city}`,
+    `Cost Center       : ${r.costCenter}`,
+    `Receipt Status    : ${r.receiptStatus}`,
+    r.comment ? `Comment           : ${r.comment}` : '',
+  ].filter(Boolean).join('\n');
+
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(lines).then(() => toast('📋 已复制，粘贴到报销系统'));
+  } else {
+    const ta = Object.assign(document.createElement('textarea'),
+      { value: lines, style: 'position:fixed;opacity:0' });
+    document.body.append(ta); ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    toast('📋 已复制，粘贴到报销系统');
+  }
+}
+
+/* ── Delete ── */
+function deleteById(id) {
+  if (!confirm('确认删除这条记录？')) return;
+  set(get().filter(r => r.id !== id));
+  renderList();
+  toast('已删除');
+}
+</script>
+</body>
+</html>
