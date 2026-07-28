@@ -616,13 +616,26 @@ function compressImage(file, maxW, q) {
   });
 }
 
+function getDisplayName(label, idx) {
+  const amt = $('amount')?.value;
+  const amtNum = amt && parseFloat(amt) > 0 ? Math.round(parseFloat(amt)) : null;
+  // count how many files share this label
+  const sameLabel = pendingFiles.filter(f => f.label === label);
+  const suffix = sameLabel.length > 1 ? (idx + 1) : '';
+  return amtNum ? `${amtNum}元${label}${suffix}` : `${label}${suffix}`;
+}
+
 function renderAttachPreview() {
   const wrap = $('attach-preview');
   if (!wrap) return;
   if (!pendingFiles.length) { wrap.innerHTML = ''; return; }
+  // compute per-label index for suffix
+  const labelIdx = {};
   wrap.innerHTML = pendingFiles.map((f, i) => {
+    labelIdx[f.label] = labelIdx[f.label] !== undefined ? labelIdx[f.label] + 1 : 0;
     const isFP = f.label === '发票';
     const labelCls = isFP ? 'fp' : 'sd';
+    const dispName = getDisplayName(f.label, labelIdx[f.label]);
     return `
     <div class="attach-item">
       ${f.type.startsWith('image/')
@@ -630,8 +643,8 @@ function renderAttachPreview() {
         : `<div class="attach-pdf">📄</div>`}
       <div style="flex:1;min-width:0">
         <div><span class="file-label ${labelCls}">${f.label}</span></div>
-        <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</div>
-        <div style="font-size:11px;color:var(--sub)">${f.type.startsWith('image/') ? '图片' : 'PDF'}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${dispName}</div>
+        <div style="font-size:11px;color:var(--sub)">${f.type.startsWith('image/') ? '原始：'+f.name : 'PDF · '+f.name}</div>
       </div>
       <button class="btn-remove" onclick="removeAttach(${i})">✕</button>
     </div>`;
@@ -700,6 +713,8 @@ initFilesDB().then(() => {
   $('transDate').value = new Date().toISOString().split('T')[0];
   toggleMealRow('个人餐费');
   renderList();
+  // 金额变化时实时更新附件显示名
+  $('amount').addEventListener('input', renderAttachPreview);
 });
 
 /* ── PWA: icon + manifest ── */
@@ -803,6 +818,15 @@ function saveExpense() {
   const data = get();
   data.unshift(rec);
   set(data);
+
+  // Stamp display name onto each file before saving
+  const _labelIdx = {};
+  pendingFiles.forEach(f => {
+    _labelIdx[f.label] = _labelIdx[f.label] !== undefined ? _labelIdx[f.label] + 1 : 0;
+    const sameCount = pendingFiles.filter(x => x.label === f.label).length;
+    const suffix = sameCount > 1 ? (_labelIdx[f.label] + 1) : '';
+    f.displayName = `${Math.round(parseFloat(rec.amount))}元${f.label}${suffix}`;
+  });
 
   // Save files to IndexedDB (linked by rec.id)
   dbSaveFiles(rec.id, pendingFiles);
@@ -951,13 +975,19 @@ function openDetail(id) {
             <span style="font-size:11px;color:var(--sub);font-weight:400">${flist.length} 个文件</span>
           </div>
           <div class="attach-grid">
-            ${flist.map(f => f.type.startsWith('image/')
-              ? `<img class="attach-grid-img" src="${f.data}" onclick="openFileViewer(${JSON.stringify(f).split('"data"')[0]+'"data":"'+f.data+'"}'}" style="cursor:pointer">`
-              : `<div class="attach-grid-pdf" onclick='openFileViewer(${JSON.stringify({type:f.type,data:f.data})})'>
-                  <span class="pico">📄</span>
-                  <span class="pname">${f.name}</span>
-                </div>`
-            ).join('')}
+            ${flist.map((f,fi) => {
+              const dname = f.displayName || f.name;
+              const fdata = JSON.stringify({type:f.type, data:f.data});
+              return f.type.startsWith('image/')
+                ? `<div style="text-align:center">
+                     <img class="attach-grid-img" src="${f.data}" onclick='openFileViewer(${fdata})'>
+                     <div style="font-size:10px;color:var(--sub);margin-top:3px;max-width:86px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${dname}</div>
+                   </div>`
+                : `<div class="attach-grid-pdf" onclick='openFileViewer(${fdata})'>
+                     <span class="pico">📄</span>
+                     <span class="pname">${dname}</span>
+                   </div>`;
+            }).join('')}
           </div>
         </div>`
       ).join('');
