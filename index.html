@@ -215,6 +215,63 @@ select.fc{
 /* ── Hidden conditional ── */
 .meal-row{display:none}
 .meal-row.show{display:grid}
+
+/* ── Company info card ── */
+.info-row{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.info-row:last-child{border-bottom:none;padding-bottom:0}
+.info-key{font-size:11px;color:var(--sub);margin-bottom:2px}
+.info-val{font-size:13px;font-weight:600;word-break:break-all;line-height:1.4}
+.copy-mini{
+  flex-shrink:0;margin-left:10px;
+  padding:5px 13px;border-radius:20px;
+  border:1.5px solid var(--primary);color:var(--primary);
+  background:none;font-size:12px;cursor:pointer;font-family:inherit;
+}
+.copy-mini:active{background:var(--primary-bg)}
+
+/* ── File upload ── */
+.upload-area{
+  border:2px dashed var(--border);border-radius:10px;
+  padding:14px;text-align:center;cursor:pointer;
+  color:var(--primary);font-size:14px;font-weight:500;
+  transition:border-color .2s,background .2s;
+}
+.upload-area:active{border-color:var(--primary);background:var(--primary-bg)}
+.attach-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px;background:var(--bg);border-radius:9px;margin-bottom:8px;
+}
+.attach-thumb{
+  width:54px;height:54px;object-fit:cover;
+  border-radius:8px;cursor:pointer;flex-shrink:0;border:1px solid var(--border);
+}
+.attach-pdf{
+  width:54px;height:54px;background:#fff0f0;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;
+}
+.btn-remove{
+  flex-shrink:0;width:26px;height:26px;border-radius:50%;
+  border:1.5px solid var(--border);background:none;color:var(--sub);
+  font-size:14px;cursor:pointer;line-height:1;
+}
+.attach-count{
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:11px;padding:2px 8px;border-radius:20px;
+  background:#fff3e0;color:#e67e00;font-weight:600;
+}
+/* detail sheet file area */
+.attach-grid{display:flex;flex-wrap:wrap;gap:8px;padding:12px 18px}
+.attach-grid-img{
+  width:80px;height:80px;object-fit:cover;border-radius:8px;cursor:pointer;
+  border:1px solid var(--border);
+}
+.attach-grid-pdf{
+  width:80px;height:80px;background:#fff0f0;border-radius:8px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:24px;cursor:pointer;border:1px solid var(--border);
+  font-size:28px;
+}
+.attach-grid-pdf span{font-size:10px;color:var(--sub);margin-top:4px;text-align:center;padding:0 4px;word-break:break-all}
 </style>
 </head>
 <body>
@@ -231,6 +288,33 @@ select.fc{
 
 <!-- ════════ LIST PAGE ════════ -->
 <div id="page-list" class="page active">
+
+  <!-- 开票信息 -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="sec-title">开票信息 <span style="font-weight:400;color:#aaa;font-size:10px;text-transform:none">点右侧按钮一键复制</span></div>
+    <div class="info-row">
+      <div style="flex:1">
+        <div class="info-key">公司名称</div>
+        <div class="info-val">默克雪兰诺有限公司</div>
+      </div>
+      <button class="copy-mini" onclick="copyText('默克雪兰诺有限公司')">复制</button>
+    </div>
+    <div class="info-row">
+      <div style="flex:1">
+        <div class="info-key">税号</div>
+        <div class="info-val">91110113551352846Q</div>
+      </div>
+      <button class="copy-mini" onclick="copyText('91110113551352846Q')">复制</button>
+    </div>
+    <div class="info-row">
+      <div style="flex:1">
+        <div class="info-key">邮箱</div>
+        <div class="info-val">1593749696@qq.com</div>
+      </div>
+      <button class="copy-mini" onclick="copyText('1593749696@qq.com')">复制</button>
+    </div>
+  </div>
+
   <div class="stats" id="stats"></div>
   <div id="list-wrap"></div>
 </div>
@@ -338,6 +422,16 @@ select.fc{
   </div>
 
   <div class="card">
+    <div class="sec-title">附件（水单 / 发票）</div>
+    <div id="attach-preview"></div>
+    <label class="upload-area">
+      <input type="file" id="file-input" accept="image/*,.pdf" multiple
+        style="display:none" onchange="handleFiles(this)">
+      📎 &nbsp;添加图片或 PDF
+    </label>
+  </div>
+
+  <div class="card">
     <div class="sec-title">备注（选填）</div>
     <textarea id="comment" class="fc" rows="3"
       placeholder="其他说明，最多 500 字" maxlength="500"
@@ -379,12 +473,106 @@ select.fc{
 
 <script>
 const KEY = 'expense_v1';
+let pendingFiles = []; // [{name, type, data}]
 
 /* ── helpers ── */
 const $  = id => document.getElementById(id);
 const get = () => JSON.parse(localStorage.getItem(KEY) || '[]');
 const set = d  => localStorage.setItem(KEY, JSON.stringify(d));
 const fmt = n  => parseFloat(n).toFixed(2);
+
+/* ── Copy plain text ── */
+function copyText(txt) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(txt).then(() => toast('📋 已复制'));
+  } else {
+    const ta = Object.assign(document.createElement('textarea'),
+      { value: txt, style: 'position:fixed;opacity:0' });
+    document.body.append(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+    toast('📋 已复制');
+  }
+}
+
+/* ── File upload ── */
+function handleFiles(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  let pending = files.length;
+
+  files.forEach(file => {
+    if (file.size > 15 * 1024 * 1024) {
+      toast(`⚠️ ${file.name} 超过15MB限制`); pending--; return;
+    }
+    if (file.type.startsWith('image/')) {
+      compressImage(file, 1200, 0.78).then(data => {
+        pendingFiles.push({ name: file.name, type: file.type, data });
+        if (--pending === 0) renderAttachPreview();
+      });
+    } else {
+      const reader = new FileReader();
+      reader.onload = e => {
+        pendingFiles.push({ name: file.name, type: file.type, data: e.target.result });
+        if (--pending === 0) renderAttachPreview();
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+  input.value = '';
+}
+
+function compressImage(file, maxW, q) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(cv.toDataURL('image/jpeg', q));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderAttachPreview() {
+  const wrap = $('attach-preview');
+  if (!wrap) return;
+  wrap.innerHTML = pendingFiles.map((f, i) => `
+    <div class="attach-item">
+      ${f.type.startsWith('image/')
+        ? `<img class="attach-thumb" src="${f.data}" onclick="viewFileByData('${i}','pending')">`
+        : `<div class="attach-pdf">📄</div>`}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</div>
+        <div style="font-size:11px;color:var(--sub)">${f.type.startsWith('image/') ? '图片' : 'PDF 文档'}</div>
+      </div>
+      <button class="btn-remove" onclick="removeAttach(${i})">✕</button>
+    </div>`).join('');
+}
+
+function removeAttach(i) {
+  pendingFiles.splice(i, 1);
+  renderAttachPreview();
+}
+
+function viewFileByData(idx, src, recId) {
+  let f;
+  if (src === 'pending') f = pendingFiles[+idx];
+  else f = (get().find(r => r.id === +recId)?.files || [])[+idx];
+  if (!f) return;
+  const win = window.open('', '_blank');
+  if (f.type === 'application/pdf') {
+    win.document.write(`<iframe src="${f.data}" style="width:100%;height:100%;border:none"></iframe>`);
+  } else {
+    win.document.write(`<img src="${f.data}" style="max-width:100%;height:auto;display:block">`);
+  }
+}
 
 function toast(msg) {
   const t = $('toast');
@@ -523,11 +711,20 @@ function saveExpense() {
     currency: $('currency').value,
     receiptStatus: $('receiptStatus').value,
     comment: $('comment').value.trim(),
+    files: pendingFiles.slice(),
   };
 
   const data = get();
   data.unshift(rec);
-  set(data);
+  try {
+    set(data);
+  } catch(e) {
+    // localStorage full — save without files
+    rec.files = [];
+    data[0] = rec;
+    set(data);
+    toast('⚠️ 存储空间不足，附件未保存');
+  }
 
   // reset
   $('amount').value = '';
@@ -536,6 +733,8 @@ function saveExpense() {
   $('comment').value = '';
   $('mealType').value = '';
   $('transDate').value = new Date().toISOString().split('T')[0];
+  pendingFiles = [];
+  renderAttachPreview();
 
   toast('✅ 已保存');
   setTimeout(() => switchPage('list'), 600);
@@ -611,6 +810,7 @@ function renderCard(r) {
         ${mealTag}${tags}
       </div>
       ${r.comment ? `<div class="ec-comment">💬 ${r.comment}</div>` : ''}
+      ${r.files && r.files.length ? `<div style="margin-top:7px"><span class="attach-count">📎 ${r.files.length} 个附件</span></div>` : ''}
     </div>
     <div class="ec-footer">
       <button class="btn-act cp" onclick="copyById(${r.id})">📋 复制填报信息</button>
@@ -638,9 +838,22 @@ function openDetail(id) {
   ].filter(Boolean);
 
   $('sheet-title').textContent = r.expenseType + ' — ' + r.transDate;
+
+  let filesHtml = '';
+  if (r.files && r.files.length) {
+    filesHtml = `
+      <div style="padding:12px 18px 4px;font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.6px">附件</div>
+      <div class="attach-grid">
+        ${r.files.map((f, i) => f.type.startsWith('image/')
+          ? `<img class="attach-grid-img" src="${f.data}" onclick="viewFileByData(${i},'rec',${r.id})">`
+          : `<div class="attach-grid-pdf" onclick="viewFileByData(${i},'rec',${r.id})">📄<span>${f.name.slice(0,10)}</span></div>`
+        ).join('')}
+      </div>`;
+  }
+
   $('sheet-body').innerHTML = rows.map(([k,v]) =>
     `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val">${v}</span></div>`
-  ).join('');
+  ).join('') + filesHtml;
   $('sheet-copy-btn').onclick = () => { copyById(id); closeSheet(); };
   $('sheet-overlay').classList.add('open');
 }
