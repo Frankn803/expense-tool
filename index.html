@@ -511,6 +511,7 @@ const KEY = 'expense_v1';
 let pendingFiles = []; // [{label:'发票'|'水单', name, type, data}]
 let filesDB = null;
 let _sheetFiles = []; // files currently shown in detail sheet
+let _currentRec  = null; // record being viewed
 
 /* ── File viewer & downloader ── */
 function openSheetFile(i) {
@@ -520,19 +521,27 @@ function openSheetFile(i) {
 function downloadSheetFile(i) {
   const f = _sheetFiles[i];
   if (!f) return;
-  const name = f.displayName || f.name;
-  // determine extension
+
+  // Count same-label files to decide suffix
+  const sameLabel = _sheetFiles.filter(x => x.label === f.label);
+  const idx = sameLabel.indexOf(f);
+  const suffix = sameLabel.length > 1 ? (idx + 1) : '';
+
+  // Always build name from record amount + label
+  const amt = _currentRec ? Math.round(parseFloat(_currentRec.amount)) : '';
+  const baseName = amt && f.label ? `${amt}元${f.label}${suffix}` : (f.displayName || f.name);
+
   const ext = f.type === 'application/pdf' ? '.pdf'
     : f.type.includes('png') ? '.png' : '.jpg';
-  const filename = name.endsWith('.pdf') || name.endsWith('.jpg') || name.endsWith('.png')
-    ? name : name + ext;
+  const filename = /\.(pdf|jpg|jpeg|png)$/i.test(baseName) ? baseName : baseName + ext;
+
   const a = document.createElement('a');
   a.href = f.data;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  toast('⬇ 已保存到下载文件夹');
+  toast(`⬇ 已保存：${filename}`);
 }
 
 /* ── helpers ── */
@@ -974,6 +983,7 @@ function openDetail(id) {
     r.comment && ['备注', r.comment],
   ].filter(Boolean);
 
+  _currentRec = r;
   $('sheet-title').textContent = r.expenseType + ' — ' + r.transDate;
 
   const baseHtml = rows.map(([k,v]) =>
