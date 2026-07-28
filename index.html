@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>报销助手</title>
+<meta name="theme-color" content="#1677ff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="报销助手">
+<link rel="apple-touch-icon" id="ati">
+<link rel="manifest" id="mani">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -420,6 +427,71 @@ function switchPage(p) {
   $('transDate').value = new Date().toISOString().split('T')[0];
   toggleMealRow('个人餐费');
   renderList();
+})();
+
+/* ── PWA: icon + manifest ── */
+(function initPWA() {
+  try {
+    const sz = 512, cv = document.createElement('canvas');
+    cv.width = cv.height = sz;
+    const ctx = cv.getContext('2d');
+
+    function rr(cx, cy, cw, ch, r) {
+      ctx.beginPath();
+      ctx.moveTo(cx+r, cy);
+      ctx.lineTo(cx+cw-r, cy); ctx.quadraticCurveTo(cx+cw, cy, cx+cw, cy+r);
+      ctx.lineTo(cx+cw, cy+ch-r); ctx.quadraticCurveTo(cx+cw, cy+ch, cx+cw-r, cy+ch);
+      ctx.lineTo(cx+r, cy+ch); ctx.quadraticCurveTo(cx, cy+ch, cx, cy+ch-r);
+      ctx.lineTo(cx, cy+r); ctx.quadraticCurveTo(cx, cy, cx+r, cy);
+      ctx.closePath(); ctx.fill();
+    }
+
+    // Blue rounded bg
+    ctx.fillStyle = '#1677ff'; rr(0, 0, sz, sz, 108);
+    // White paper
+    ctx.fillStyle = '#ffffff'; rr(148, 72, 216, 288, 18);
+    // Header stripe
+    ctx.fillStyle = '#ddeeff'; rr(178, 114, 156, 22, 7);
+    // Content lines
+    ctx.fillStyle = '#eef5ff';
+    rr(178, 152, 108, 14, 5);
+    rr(178, 180, 136, 14, 5);
+    rr(178, 208, 84, 14, 5);
+    // Amount box
+    ctx.fillStyle = '#ddeeff'; rr(178, 248, 156, 52, 12);
+    // ¥ symbol
+    ctx.fillStyle = '#1677ff';
+    ctx.font = 'bold 56px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('¥', 256, 274);
+    // Zigzag bottom
+    ctx.fillStyle = '#c8dfff';
+    ctx.beginPath();
+    ctx.moveTo(148, 344);
+    for (let i = 148; i < 364; i += 36) {
+      ctx.lineTo(i+18, 326); ctx.lineTo(i+36, 344);
+    }
+    ctx.lineTo(364, 372); ctx.lineTo(148, 372);
+    ctx.closePath(); ctx.fill();
+
+    const iconURL = cv.toDataURL('image/png');
+
+    // iOS apple-touch-icon
+    document.getElementById('ati').href = iconURL;
+
+    // Android manifest
+    const m = {
+      name: '报销助手', short_name: '报销助手',
+      description: '快速记录报销费用，对照填报',
+      start_url: './', scope: './',
+      display: 'standalone', orientation: 'portrait',
+      background_color: '#1677ff', theme_color: '#1677ff', lang: 'zh-CN',
+      icons: [{ src: iconURL, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }]
+    };
+    const blob = new Blob([JSON.stringify(m)], { type: 'application/json' });
+    document.getElementById('mani').href = URL.createObjectURL(blob);
+  } catch(e) {}
 })();
 
 /* ── Save ── */
